@@ -43,14 +43,9 @@ function RootComponent() {
   const router = useRouter();
   const location = useLocation();
   useEffect(() => {
-    import("@/lib/firebase").then(({ auth }) => {
-      const unsubscribe = auth.onAuthStateChanged(() => {
-        router.invalidate();
-        queryClient.invalidateQueries();
-      });
-      return () => unsubscribe();
-    });
-  }, [router, queryClient]);
+    // Removed global onAuthStateChanged to prevent excessive re-renders.
+    // Individual components use useAuth() hook which is more efficient.
+  }, []);
   const isAdmin = location.pathname.startsWith("/admin");
   return (
     <QueryClientProvider client={queryClient}>
