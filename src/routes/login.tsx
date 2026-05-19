@@ -100,35 +100,48 @@ function Login() {
         <p className="text-center text-muted-foreground text-sm mb-6">
           {mode === "login" ? "أهلًا بعودتك" : mode === "signup" ? "انضم لعائلة حديقة العطور" : "سنرسل رابطاً سحرياً لبريدك"}
         </p>
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-4">
           {mode === "signup" && (
-            <input name="name" required placeholder="الاسم الكامل" className="w-full px-3 py-3 rounded-lg border border-input bg-background" />
+            <input name="name" required placeholder="الاسم الكامل" autoComplete="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" />
           )}
-          <input name="email" required type="email" placeholder="البريد الإلكتروني" className="w-full px-3 py-3 rounded-lg border border-input bg-background" />
+          <input name="email" required type="email" placeholder="البريد الإلكتروني" autoComplete="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" />
           
           {mode !== "magic-link" && (
-            <input name="password" required type="password" placeholder="كلمة المرور" className="w-full px-3 py-3 rounded-lg border border-input bg-background" minLength={6} />
+            <input name="password" required type="password" placeholder="كلمة المرور" autoComplete="new-password" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" minLength={6} />
           )}
           
-          <button disabled={loading} className="w-full gradient-gold text-primary-foreground py-3 rounded-lg font-bold disabled:opacity-50">
-            {loading ? "جاري..." : mode === "login" ? "دخول" : mode === "signup" ? "إنشاء حساب" : "إرسال الرابط"}
+          <button disabled={loading} className="w-full gradient-gold text-primary-foreground py-3.5 rounded-xl font-bold disabled:opacity-50 shadow-lg shadow-gold/20 hover:shadow-gold/40 transition">
+            {loading ? "جاري..." : mode === "login" ? "تسجيل دخول" : mode === "signup" ? "إنشاء حساب" : "إرسال رابط الدخول للإيميل"}
           </button>
         </form>
-        <div className="text-center text-sm mt-4 flex flex-col gap-2">
-          {mode === "login" && (
+
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">أو</span></div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {mode === "login" ? (
             <>
-              <div>ليس لديك حساب؟ <button onClick={() => setMode("signup")} className="text-gold font-bold">إنشاء حساب</button></div>
-              <div><button onClick={() => setMode("magic-link")} className="text-muted-foreground hover:text-gold transition">تسجيل الدخول برابط سحري بدلاً من ذلك</button></div>
+              <button type="button" onClick={() => setMode("magic-link")} className="w-full bg-accent/50 hover:bg-accent text-foreground py-3 rounded-xl font-medium transition border border-border">
+                الدخول برابط سحري للإيميل (بدون كلمة مرور)
+              </button>
+              <div className="text-center text-sm mt-2">
+                ليس لديك حساب؟ <button onClick={() => setMode("signup")} className="text-gold font-bold hover:underline">إنشاء حساب جديد</button>
+              </div>
             </>
-          )}
-          {mode === "signup" && (
-            <div>لديك حساب؟ <button onClick={() => setMode("login")} className="text-gold font-bold">تسجيل دخول</button></div>
-          )}
-          {mode === "magic-link" && (
-            <div>تذكرت كلمة المرور؟ <button onClick={() => setMode("login")} className="text-gold font-bold">العودة لتسجيل الدخول</button></div>
+          ) : mode === "signup" ? (
+            <div className="text-center text-sm">
+              لديك حساب بالفعل؟ <button onClick={() => setMode("login")} className="text-gold font-bold hover:underline">تسجيل دخول</button>
+            </div>
+          ) : (
+            <div className="text-center text-sm">
+              تذكرت كلمة المرور؟ <button onClick={() => setMode("login")} className="text-gold font-bold hover:underline">العودة لتسجيل الدخول</button>
+            </div>
           )}
         </div>
-        <Link to="/" className="block text-center text-xs text-muted-foreground mt-4 hover:text-gold">العودة للرئيسية</Link>
+        
+        <Link to="/" className="block text-center text-sm text-muted-foreground mt-8 hover:text-gold transition">العودة للرئيسية</Link>
       </div>
     </div>
   );
