@@ -24,7 +24,7 @@ export function Header() {
       </div>
       <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2">
-          <span className="text-2xl font-extrabold text-gold">حديقة العطور</span>
+          <span className="text-2xl font-extrabold text-gold"> </span>  لمسة عطر </span>
         </Link>
         <nav className="hidden lg:flex items-center gap-6">
           {nav.map((n) => (
