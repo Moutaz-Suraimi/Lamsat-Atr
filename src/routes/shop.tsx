@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useDeferredValue } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { ProductCard } from "@/components/store/ProductCard";
@@ -10,6 +10,7 @@ export const Route = createFileRoute("/shop")({ component: Shop });
 
 function Shop() {
   const [q, setQ] = useState("");
+  const deferredQ = useDeferredValue(q);
   const [cat, setCat] = useState<string>("all");
   const [sort, setSort] = useState("newest");
 
@@ -40,7 +41,7 @@ function Shop() {
     },
   });
 
-  const filtered = useMemo(() => (products ?? []).filter((p) => p.name.toLowerCase().includes(q.toLowerCase())), [products, q]);
+  const filtered = useMemo(() => (products ?? []).filter((p) => p.name.toLowerCase().includes(deferredQ.toLowerCase())), [products, deferredQ]);
 
   return (
     <div className="container mx-auto px-4 py-8">

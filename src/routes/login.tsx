@@ -10,13 +10,15 @@ export const Route = createFileRoute("/login")({ component: Login });
 function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const name = formData.get("name") as string;
+
     setLoading(true);
     try {
       if (mode === "login") {
@@ -54,10 +56,10 @@ function Login() {
         <p className="text-center text-muted-foreground text-sm mb-6">{mode === "login" ? "أهلًا بعودتك" : "انضم لعائلة حديقة العطور"}</p>
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (
-            <input required placeholder="الاسم الكامل" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-3 rounded-lg border border-input bg-background" />
+            <input name="name" required placeholder="الاسم الكامل" className="w-full px-3 py-3 rounded-lg border border-input bg-background" />
           )}
-          <input required type="email" placeholder="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-3 rounded-lg border border-input bg-background" />
-          <input required type="password" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-3 rounded-lg border border-input bg-background" minLength={6} />
+          <input name="email" required type="email" placeholder="البريد الإلكتروني" className="w-full px-3 py-3 rounded-lg border border-input bg-background" />
+          <input name="password" required type="password" placeholder="كلمة المرور" className="w-full px-3 py-3 rounded-lg border border-input bg-background" minLength={6} />
           <button disabled={loading} className="w-full gradient-gold text-primary-foreground py-3 rounded-lg font-bold disabled:opacity-50">
             {loading ? "جاري..." : mode === "login" ? "دخول" : "إنشاء حساب"}
           </button>
