@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db } from "@/lib/firebase";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({ component: Login });
@@ -16,17 +18,32 @@ function Login() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      if (mode === "login") {
+        await signInWithEmailAndPassword(auth, email, password);
+        toast.success("تم تسجيل الدخول");
+        navigate({ to: "/account" });
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        await updateProfile(user, { displayName: name });
+        
+        // Save to firestore profiles
+        await setDoc(doc(db, "profiles", user.uid), {
+          id: user.uid,
+          email: user.email,
+          full_name: name,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        toast.success("تم إنشاء الحساب بنجاح");
+        navigate({ to: "/account" });
+      }
+    } catch (error: any) {
+      toast.error(error.message || "حدث خطأ");
+    } finally {
       setLoading(false);
-      if (error) return toast.error(error.message);
-      toast.success("تم تسجيل الدخول");
-      navigate({ to: "/account" });
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin, data: { full_name: name } } });
-      setLoading(false);
-      if (error) return toast.error(error.message);
-      toast.success("تم إنشاء الحساب، يرجى التحقق من بريدك");
     }
   };
 

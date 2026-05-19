@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs, addDoc, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,32 +10,67 @@ export const Route = createFileRoute("/admin/settings")({ component: Settings })
 
 function Settings() {
   const qc = useQueryClient();
-  const { data: cats } = useQuery({ queryKey: ["adm-cats-s"], queryFn: async () => (await supabase.from("categories").select("*").order("sort_order")).data ?? [] });
-  const { data: brands } = useQuery({ queryKey: ["adm-brands-s"], queryFn: async () => (await supabase.from("brands").select("*").order("name")).data ?? [] });
-  const { data: settings } = useQuery({ queryKey: ["adm-settings"], queryFn: async () => (await supabase.from("site_settings").select("*")).data ?? [] });
+  const { data: cats } = useQuery({ 
+    queryKey: ["adm-cats-s"], 
+    queryFn: async () => {
+      const q = query(collection(db, "categories"), orderBy("sort_order"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
+  const { data: brands } = useQuery({ 
+    queryKey: ["adm-brands-s"], 
+    queryFn: async () => {
+      const q = query(collection(db, "brands"), orderBy("name"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
+  const { data: settings } = useQuery({ 
+    queryKey: ["adm-settings"], 
+    queryFn: async () => {
+      const snapshot = await getDocs(collection(db, "site_settings"));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
 
   const [newCat, setNewCat] = useState({ name: "", slug: "" });
   const [newBrand, setNewBrand] = useState({ name: "", slug: "", logo_url: "" });
 
   const addCat = async () => {
     if (!newCat.name || !newCat.slug) return;
-    const { error } = await supabase.from("categories").insert(newCat);
-    if (error) return toast.error(error.message);
-    setNewCat({ name: "", slug: "" }); qc.invalidateQueries({ queryKey: ["adm-cats-s"] });
+    try {
+      await addDoc(collection(db, "categories"), newCat);
+      setNewCat({ name: "", slug: "" }); 
+      qc.invalidateQueries({ queryKey: ["adm-cats-s"] });
+    } catch (error: any) { toast.error(error.message); }
   };
-  const delCat = async (id: string) => { if (!confirm("حذف؟")) return; await supabase.from("categories").delete().eq("id", id); qc.invalidateQueries({ queryKey: ["adm-cats-s"] }); };
+  const delCat = async (id: string) => { 
+    if (!confirm("حذف؟")) return; 
+    await deleteDoc(doc(db, "categories", id)); 
+    qc.invalidateQueries({ queryKey: ["adm-cats-s"] }); 
+  };
 
   const addBrand = async () => {
     if (!newBrand.name || !newBrand.slug) return;
-    const { error } = await supabase.from("brands").insert(newBrand);
-    if (error) return toast.error(error.message);
-    setNewBrand({ name: "", slug: "", logo_url: "" }); qc.invalidateQueries({ queryKey: ["adm-brands-s"] });
+    try {
+      await addDoc(collection(db, "brands"), newBrand);
+      setNewBrand({ name: "", slug: "", logo_url: "" }); 
+      qc.invalidateQueries({ queryKey: ["adm-brands-s"] });
+    } catch (error: any) { toast.error(error.message); }
   };
-  const delBrand = async (id: string) => { if (!confirm("حذف؟")) return; await supabase.from("brands").delete().eq("id", id); qc.invalidateQueries({ queryKey: ["adm-brands-s"] }); };
+  const delBrand = async (id: string) => { 
+    if (!confirm("حذف؟")) return; 
+    await deleteDoc(doc(db, "brands", id)); 
+    qc.invalidateQueries({ queryKey: ["adm-brands-s"] }); 
+  };
 
   const saveSetting = async (key: string, value: string) => {
-    await supabase.from("site_settings").upsert({ key, value });
-    toast.success("تم الحفظ"); qc.invalidateQueries({ queryKey: ["adm-settings"] });
+    try {
+      await setDoc(doc(db, "site_settings", key), { key, value });
+      toast.success("تم الحفظ"); 
+      qc.invalidateQueries({ queryKey: ["adm-settings"] });
+    } catch (error: any) { toast.error(error.message); }
   };
 
   const getS = (k: string) => settings?.find((s: any) => s.key === k)?.value ?? "";

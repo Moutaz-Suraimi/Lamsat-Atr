@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { ProductCard } from "@/components/store/ProductCard";
 import { Search } from "lucide-react";
 
@@ -12,16 +13,30 @@ function Shop() {
   const [cat, setCat] = useState<string>("all");
   const [sort, setSort] = useState("newest");
 
-  const { data: cats } = useQuery({ queryKey: ["cats"], queryFn: async () => (await supabase.from("categories").select("*").order("sort_order")).data ?? [] });
+  const { data: cats } = useQuery({ 
+    queryKey: ["cats"], 
+    queryFn: async () => {
+      const q = query(collection(db, "categories"), orderBy("sort_order"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } 
+  });
+
   const { data: products, isLoading } = useQuery({
     queryKey: ["shop-products", cat, sort],
     queryFn: async () => {
-      let req = supabase.from("products").select("id,name,slug,price,sale_price,image_url,is_expert_pick,category_id").eq("is_active", true);
-      if (cat !== "all") req = req.eq("category_id", cat);
-      if (sort === "price_asc") req = req.order("price", { ascending: true });
-      else if (sort === "price_desc") req = req.order("price", { ascending: false });
-      else req = req.order("created_at", { ascending: false });
-      return (await req).data ?? [];
+      const productsRef = collection(db, "products");
+      let conditions: any[] = [where("is_active", "==", true)];
+      
+      if (cat !== "all") conditions.push(where("category_id", "==", cat));
+      
+      if (sort === "price_asc") conditions.push(orderBy("price", "asc"));
+      else if (sort === "price_desc") conditions.push(orderBy("price", "desc"));
+      else conditions.push(orderBy("created_at", "desc"));
+
+      const q = query(productsRef, ...conditions);
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 

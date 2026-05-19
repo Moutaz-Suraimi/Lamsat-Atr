@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext, useRouter, HeadContent, Scripts, useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Toaster } from "sonner";
 import { Header } from "@/components/store/Header";
 import { Footer } from "@/components/store/Footer";
@@ -43,8 +43,13 @@ function RootComponent() {
   const router = useRouter();
   const location = useLocation();
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => { router.invalidate(); queryClient.invalidateQueries(); });
-    return () => subscription.unsubscribe();
+    import("@/lib/firebase").then(({ auth }) => {
+      const unsubscribe = auth.onAuthStateChanged(() => {
+        router.invalidate();
+        queryClient.invalidateQueries();
+      });
+      return () => unsubscribe();
+    });
   }, [router, queryClient]);
   const isAdmin = location.pathname.startsWith("/admin");
   return (

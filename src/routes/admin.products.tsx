@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs, addDoc, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { formatPrice } from "@/lib/format";
 import { Plus, Edit2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -14,9 +15,28 @@ function ProductsAdmin() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<any | null>(null);
 
-  const { data: products } = useQuery({ queryKey: ["adm-products"], queryFn: async () => (await supabase.from("products").select("*").order("created_at", { ascending: false })).data ?? [] });
-  const { data: cats } = useQuery({ queryKey: ["adm-cats"], queryFn: async () => (await supabase.from("categories").select("*")).data ?? [] });
-  const { data: brands } = useQuery({ queryKey: ["adm-brands"], queryFn: async () => (await supabase.from("brands").select("*")).data ?? [] });
+  const { data: products } = useQuery({ 
+    queryKey: ["adm-products"], 
+    queryFn: async () => {
+      const q = query(collection(db, "products"), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
+  const { data: cats } = useQuery({ 
+    queryKey: ["adm-cats"], 
+    queryFn: async () => {
+      const snapshot = await getDocs(collection(db, "categories"));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
+  const { data: brands } = useQuery({ 
+    queryKey: ["adm-brands"], 
+    queryFn: async () => {
+      const snapshot = await getDocs(collection(db, "brands"));
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
 
   const save = async () => {
     if (!editing.name || !editing.slug || !editing.price) return toast.error("اسم، رابط، سعر مطلوبة");
@@ -26,21 +46,33 @@ function ProductsAdmin() {
     else payload.sale_price = Number(payload.sale_price);
     payload.price = Number(payload.price);
     payload.stock = Number(payload.stock || 0);
-    let err;
-    if (editing.id) ({ error: err } = await supabase.from("products").update(payload).eq("id", editing.id));
-    else ({ error: err } = await supabase.from("products").insert(payload));
-    if (err) return toast.error(err.message);
-    toast.success("تم الحفظ");
-    setEditing(null);
-    qc.invalidateQueries({ queryKey: ["adm-products"] });
+    
+    try {
+      if (editing.id) {
+        payload.updated_at = new Date().toISOString();
+        await setDoc(doc(db, "products", editing.id), payload, { merge: true });
+      } else {
+        payload.created_at = new Date().toISOString();
+        payload.updated_at = new Date().toISOString();
+        await addDoc(collection(db, "products"), payload);
+      }
+      toast.success("تم الحفظ");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["adm-products"] });
+    } catch (err: any) {
+      toast.error(err.message || "فشل الحفظ");
+    }
   };
 
   const del = async (id: string) => {
     if (!confirm("حذف المنتج؟")) return;
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("تم الحذف");
-    qc.invalidateQueries({ queryKey: ["adm-products"] });
+    try {
+      await deleteDoc(doc(db, "products", id));
+      toast.success("تم الحذف");
+      qc.invalidateQueries({ queryKey: ["adm-products"] });
+    } catch (error: any) {
+      toast.error(error.message || "فشل الحذف");
+    }
   };
 
   return (

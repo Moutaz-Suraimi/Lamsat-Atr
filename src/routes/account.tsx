@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc, collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { useAuth } from "@/hooks/use-auth";
 import { formatPrice } from "@/lib/format";
 import { LogOut, User, Package } from "lucide-react";
@@ -18,21 +19,36 @@ function Account() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setProfile({ full_name: data.full_name ?? "", phone: data.phone ?? "", address: data.address ?? "", city: data.city ?? "" });
-    });
+    const fetchProfile = async () => {
+      const docRef = doc(db, "profiles", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setProfile({ full_name: data.full_name ?? "", phone: data.phone ?? "", address: data.address ?? "", city: data.city ?? "" });
+      }
+    };
+    fetchProfile();
   }, [user]);
 
   const { data: orders } = useQuery({
-    queryKey: ["my-orders", user?.id],
+    queryKey: ["my-orders", user?.uid],
     enabled: !!user,
-    queryFn: async () => (await supabase.from("orders").select("*").eq("user_id", user!.id).order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => {
+      const q = query(collection(db, "orders"), where("user_id", "==", user!.uid), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    },
   });
 
   const save = async () => {
     if (!user) return;
-    const { error } = await supabase.from("profiles").update({ ...profile, email: user.email }).eq("id", user.id);
-    if (error) toast.error("فشل الحفظ"); else toast.success("تم الحفظ");
+    try {
+      await setDoc(doc(db, "profiles", user.uid), { ...profile, email: user.email }, { merge: true });
+      toast.success("تم الحفظ");
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل الحفظ");
+    }
   };
 
   if (loading || !user) return <div className="container mx-auto px-4 py-20 text-center">جاري التحميل...</div>;
@@ -62,14 +78,14 @@ function Account() {
           {(orders ?? []).length === 0 ? (
             <p className="text-sm text-muted-foreground">لا توجد طلبات بعد</p>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-auto">
-              {orders!.map((o) => (
-                <div key={o.id} className="border border-border rounded-lg p-3 text-sm">
-                  <div className="flex justify-between mb-1"><span className="font-bold">{o.order_number}</span><span className="text-gold font-bold">{formatPrice(o.total)}</span></div>
-                  <div className="text-xs text-muted-foreground">{o.status} • {new Date(o.created_at).toLocaleDateString("ar")}</div>
-                </div>
-              ))}
-            </div>
+             <div className="space-y-2 max-h-96 overflow-auto">
+               {orders!.map((o) => (
+                 <div key={o.id} className="border border-border rounded-lg p-3 text-sm">
+                   <div className="flex justify-between mb-1"><span className="font-bold">{o.order_number}</span><span className="text-gold font-bold">{formatPrice(o.total)}</span></div>
+                   <div className="text-xs text-muted-foreground">{o.status} • {new Date(o.created_at).toLocaleDateString("ar")}</div>
+                 </div>
+               ))}
+             </div>
           )}
           <Link to="/track-order" className="block mt-4 text-center text-sm text-gold">تتبّع طلب</Link>
         </div>

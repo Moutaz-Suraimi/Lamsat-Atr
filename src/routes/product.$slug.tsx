@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { useCart } from "@/lib/cart-store";
 import { formatPrice, discountPercent } from "@/lib/format";
 import { useState } from "react";
@@ -18,7 +19,13 @@ function ProductPage() {
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", slug],
-    queryFn: async () => (await supabase.from("products").select("*").eq("slug", slug).maybeSingle()).data,
+    queryFn: async () => {
+      const q = query(collection(db, "products"), where("slug", "==", slug));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      const doc = snapshot.docs[0];
+      return { id: doc.id, ...doc.data() } as any;
+    },
   });
 
   if (isLoading) return <div className="container mx-auto px-4 py-20 text-center">جاري التحميل...</div>;

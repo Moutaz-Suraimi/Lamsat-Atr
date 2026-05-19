@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, getDocs, addDoc, writeBatch, doc } from "firebase/firestore";
 import { useCart } from "@/lib/cart-store";
 import { useAuth } from "@/hooks/use-auth";
 import { formatPrice } from "@/lib/format";
@@ -20,7 +21,11 @@ function Checkout() {
 
   const { data: methods } = useQuery({
     queryKey: ["payment_methods"],
-    queryFn: async () => (await supabase.from("payment_methods").select("*").eq("is_active", true).order("sort_order")).data ?? [],
+    queryFn: async () => {
+      const q = query(collection(db, "payment_methods"), where("is_active", "==", true), orderBy("sort_order"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    },
   });
 
   const [form, setForm] = useState({ customer_name: "", phone: "", email: "", address: "", city: "", notes: "" });
@@ -34,22 +39,49 @@ function Checkout() {
     setLoading(true);
     const subtotal = total;
     const grand = subtotal + shipping;
-    const { data: order, error } = await supabase.from("orders").insert({
-      user_id: user?.id ?? null,
-      ...form,
-      payment_method: pay,
-      subtotal, shipping, total: grand,
-    }).select().single();
-    if (error || !order) { setLoading(false); return toast.error("فشل إنشاء الطلب"); }
-    const { error: e2 } = await supabase.from("order_items").insert(items.map((i) => ({
-      order_id: order.id, product_id: i.id, product_name: i.name, product_image: i.image,
-      quantity: i.quantity, unit_price: i.price, line_total: i.price * i.quantity,
-    })));
-    setLoading(false);
-    if (e2) return toast.error("فشل إضافة المنتجات");
-    clear();
-    toast.success("تم إنشاء الطلب بنجاح: " + order.order_number);
-    navigate({ to: "/track-order", search: { order: order.order_number } as any });
+    
+    try {
+      const orderNumber = "ORD-" + Math.floor(Math.random() * 1000000);
+      
+      // Create the order document
+      const orderRef = await addDoc(collection(db, "orders"), {
+        user_id: user?.uid ?? null,
+        ...form,
+        payment_method: pay,
+        subtotal, 
+        shipping, 
+        total: grand,
+        status: "pending",
+        order_number: orderNumber,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      // Batch insert order items
+      const batch = writeBatch(db);
+      items.forEach((i) => {
+        const itemRef = doc(collection(db, "order_items"));
+        batch.set(itemRef, {
+          order_id: orderRef.id,
+          product_id: i.id,
+          product_name: i.name,
+          product_image: i.image,
+          quantity: i.quantity,
+          unit_price: i.price,
+          line_total: i.price * i.quantity
+        });
+      });
+      await batch.commit();
+
+      clear();
+      toast.success("تم إنشاء الطلب بنجاح: " + orderNumber);
+      navigate({ to: "/track-order", search: { order: orderNumber } as any });
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل إنشاء الطلب");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copy = (txt: string) => { navigator.clipboard.writeText(txt); toast.success("تم النسخ"); };

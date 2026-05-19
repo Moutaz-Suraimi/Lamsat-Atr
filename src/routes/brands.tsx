@@ -1,11 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs } from "firebase/firestore";
 
 export const Route = createFileRoute("/brands")({ component: Brands });
 
 function Brands() {
-  const { data } = useQuery({ queryKey: ["brands"], queryFn: async () => (await supabase.from("brands").select("*").order("name")).data ?? [] });
+  const { data } = useQuery({ 
+    queryKey: ["brands"], 
+    queryFn: async () => {
+      const q = query(collection(db, "brands"), orderBy("name"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gold mb-2 text-center">الماركات</h1>

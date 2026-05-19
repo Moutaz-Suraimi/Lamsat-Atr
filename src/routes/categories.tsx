@@ -1,11 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs } from "firebase/firestore";
 
 export const Route = createFileRoute("/categories")({ component: Categories });
 
 function Categories() {
-  const { data } = useQuery({ queryKey: ["all-cats"], queryFn: async () => (await supabase.from("categories").select("*").order("sort_order")).data ?? [] });
+  const { data } = useQuery({ 
+    queryKey: ["all-cats"], 
+    queryFn: async () => {
+      const q = query(collection(db, "categories"), orderBy("sort_order"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
   const colors = ["from-amber-500 to-yellow-600", "from-rose-500 to-pink-600", "from-emerald-500 to-teal-600", "from-violet-500 to-purple-600", "from-blue-500 to-cyan-600", "from-orange-500 to-red-600"];
   return (
     <div className="container mx-auto px-4 py-8">

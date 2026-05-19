@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs } from "firebase/firestore";
 import { formatPrice } from "@/lib/format";
 import { Package, ShoppingBag, Users, DollarSign } from "lucide-react";
 
@@ -10,18 +11,21 @@ function Dashboard() {
   const { data } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
-      const [products, orders, customers] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }),
-        supabase.from("orders").select("total,status,created_at").order("created_at", { ascending: false }),
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
+      const [productsSnap, ordersSnap, profilesSnap] = await Promise.all([
+        getDocs(collection(db, "products")),
+        getDocs(query(collection(db, "orders"), orderBy("created_at", "desc"))),
+        getDocs(collection(db, "profiles")),
       ]);
-      const totalRevenue = (orders.data ?? []).filter(o => o.status !== "cancelled").reduce((s, o) => s + Number(o.total), 0);
+      
+      const orders = ordersSnap.docs.map(doc => doc.data() as any);
+      const totalRevenue = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + Number(o.total), 0);
+      
       return {
-        products: products.count ?? 0,
-        orders: orders.data?.length ?? 0,
-        customers: customers.count ?? 0,
+        products: productsSnap.size,
+        orders: orders.length,
+        customers: profilesSnap.size,
         revenue: totalRevenue,
-        recent: (orders.data ?? []).slice(0, 8),
+        recent: orders.slice(0, 8),
       };
     },
   });

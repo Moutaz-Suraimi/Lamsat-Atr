@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, orderBy, getDocs, doc, setDoc, addDoc, deleteDoc } from "firebase/firestore";
 import { Plus, Edit2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,27 +13,44 @@ const empty = { name: "", type: "wallet", account_number: "", account_holder: ""
 function Payments() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<any | null>(null);
-  const { data } = useQuery({ queryKey: ["adm-pay"], queryFn: async () => (await supabase.from("payment_methods").select("*").order("sort_order")).data ?? [] });
+  const { data } = useQuery({ 
+    queryKey: ["adm-pay"], 
+    queryFn: async () => {
+      const q = query(collection(db, "payment_methods"), orderBy("sort_order"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    } 
+  });
 
   const save = async () => {
     if (!editing.name) return toast.error("الاسم مطلوب");
     const p = { ...editing };
     delete p.created_at;
     p.sort_order = Number(p.sort_order || 0);
-    let err;
-    if (editing.id) ({ error: err } = await supabase.from("payment_methods").update(p).eq("id", editing.id));
-    else ({ error: err } = await supabase.from("payment_methods").insert(p));
-    if (err) return toast.error(err.message);
-    toast.success("تم الحفظ");
-    setEditing(null);
-    qc.invalidateQueries({ queryKey: ["adm-pay"] });
+    
+    try {
+      if (editing.id) {
+        await setDoc(doc(db, "payment_methods", editing.id), p, { merge: true });
+      } else {
+        await addDoc(collection(db, "payment_methods"), p);
+      }
+      toast.success("تم الحفظ");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["adm-pay"] });
+    } catch (err: any) {
+      toast.error(err.message || "فشل الحفظ");
+    }
   };
 
   const del = async (id: string) => {
     if (!confirm("حذف؟")) return;
-    const { error } = await supabase.from("payment_methods").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["adm-pay"] });
+    try {
+      await deleteDoc(doc(db, "payment_methods", id));
+      qc.invalidateQueries({ queryKey: ["adm-pay"] });
+      toast.success("تم الحذف");
+    } catch (err: any) {
+      toast.error(err.message || "فشل الحذف");
+    }
   };
 
   return (

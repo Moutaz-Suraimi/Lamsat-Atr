@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, getDocs, updateDoc, deleteDoc, doc, writeBatch } from "firebase/firestore";
 import { formatPrice } from "@/lib/format";
 import { Eye, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -20,33 +21,51 @@ function OrdersAdmin() {
   const { data: orders } = useQuery({
     queryKey: ["adm-orders", filter],
     queryFn: async () => {
-      let q = supabase.from("orders").select("*").order("created_at", { ascending: false });
-      if (filter !== "all") q = q.eq("status", filter as any);
-      return (await q).data ?? [];
+      let q;
+      if (filter !== "all") {
+        q = query(collection(db, "orders"), where("status", "==", filter), orderBy("created_at", "desc"));
+      } else {
+        q = query(collection(db, "orders"), orderBy("created_at", "desc"));
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
     },
   });
 
   const open = async (o: any) => {
     setView(o);
-    const { data } = await supabase.from("order_items").select("*").eq("order_id", o.id);
-    setItems(data ?? []);
+    const q = query(collection(db, "order_items"), where("order_id", "==", o.id));
+    const snapshot = await getDocs(q);
+    setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
   const changeStatus = async (id: string, status: string) => {
-    const { error } = await supabase.from("orders").update({ status: status as any }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("تم التحديث");
-    qc.invalidateQueries({ queryKey: ["adm-orders"] });
-    if (view?.id === id) setView({ ...view, status });
+    try {
+      await updateDoc(doc(db, "orders", id), { status });
+      toast.success("تم التحديث");
+      qc.invalidateQueries({ queryKey: ["adm-orders"] });
+      if (view?.id === id) setView({ ...view, status });
+    } catch (err: any) {
+      toast.error(err.message || "فشل التحديث");
+    }
   };
 
   const del = async (id: string) => {
     if (!confirm("حذف الطلب؟")) return;
-    await supabase.from("order_items").delete().eq("order_id", id);
-    const { error } = await supabase.from("orders").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("تم الحذف");
-    qc.invalidateQueries({ queryKey: ["adm-orders"] });
+    try {
+      const q = query(collection(db, "order_items"), where("order_id", "==", id));
+      const itemsSnapshot = await getDocs(q);
+      
+      const batch = writeBatch(db);
+      itemsSnapshot.forEach(docSnap => batch.delete(docSnap.ref));
+      batch.delete(doc(db, "orders", id));
+      await batch.commit();
+
+      toast.success("تم الحذف");
+      qc.invalidateQueries({ queryKey: ["adm-orders"] });
+    } catch (err: any) {
+      toast.error(err.message || "فشل الحذف");
+    }
   };
 
   return (

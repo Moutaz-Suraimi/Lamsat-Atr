@@ -1,17 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { ProductCard } from "@/components/store/ProductCard";
 import incense from "@/assets/incense-banner.jpg";
 
 export const Route = createFileRoute("/incense")({ component: Incense });
 
 function Incense() {
-  const { data: cat } = useQuery({ queryKey: ["incense-cat"], queryFn: async () => (await supabase.from("categories").select("*").eq("slug", "incense").maybeSingle()).data });
+  const { data: cat } = useQuery({ 
+    queryKey: ["incense-cat"], 
+    queryFn: async () => {
+      const q = query(collection(db, "categories"), where("slug", "==", "incense"));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+    } 
+  });
+  
   const { data: products } = useQuery({
     queryKey: ["incense-products", cat?.id],
     enabled: !!cat?.id,
-    queryFn: async () => (await supabase.from("products").select("id,name,slug,price,sale_price,image_url,is_expert_pick").eq("category_id", cat!.id).eq("is_active", true)).data ?? [],
+    queryFn: async () => {
+      const q = query(collection(db, "products"), where("category_id", "==", cat!.id), where("is_active", "==", true));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+    }
   });
   return (
     <div>

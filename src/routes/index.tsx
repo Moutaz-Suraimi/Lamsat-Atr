@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, limit, getDocs } from "firebase/firestore";
 import { ProductCard } from "@/components/store/ProductCard";
 import { Truck, Shield, Headphones, Tag } from "lucide-react";
 import heroImg from "@/assets/hero-perfume.jpg";
@@ -13,14 +14,19 @@ function useProducts(filter: string) {
   return useQuery({
     queryKey: ["products", filter],
     queryFn: async () => {
-      let q = supabase.from("products").select("id,name,slug,price,sale_price,image_url,is_expert_pick").eq("is_active", true).limit(8);
-      if (filter === "bestseller") q = q.eq("is_bestseller", true);
-      if (filter === "today") q = q.eq("is_today_offer", true);
-      if (filter === "new") q = q.eq("is_new", true);
-      if (filter === "men") q = q.eq("is_featured", true);
-      if (filter === "expert") q = q.eq("is_expert_pick", true);
-      const { data } = await q;
-      return data ?? [];
+      const productsRef = collection(db, "products");
+      let conditions = [where("is_active", "==", true)];
+      
+      if (filter === "bestseller") conditions.push(where("is_bestseller", "==", true));
+      if (filter === "today") conditions.push(where("is_today_offer", "==", true));
+      if (filter === "new") conditions.push(where("is_new", "==", true));
+      if (filter === "men") conditions.push(where("is_featured", "==", true));
+      if (filter === "expert") conditions.push(where("is_expert_pick", "==", true));
+      
+      const q = query(productsRef, ...conditions, limit(8));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
   });
 }

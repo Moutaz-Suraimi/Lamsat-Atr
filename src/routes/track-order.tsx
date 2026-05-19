@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { formatPrice } from "@/lib/format";
 import { Search } from "lucide-react";
 
@@ -18,12 +19,20 @@ function Track() {
 
   const search = async () => {
     setSearched(true);
-    const { data } = await supabase.from("orders").select("*").eq("order_number", num).maybeSingle();
-    setResult(data);
-    if (data) {
-      const { data: it } = await supabase.from("order_items").select("*").eq("order_id", data.id);
-      setItems(it ?? []);
-    } else setItems([]);
+    const q = query(collection(db, "orders"), where("order_number", "==", num));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const orderDoc = snapshot.docs[0];
+      const data = { id: orderDoc.id, ...orderDoc.data() } as any;
+      setResult(data);
+      
+      const itemsQ = query(collection(db, "order_items"), where("order_id", "==", orderDoc.id));
+      const itemsSnapshot = await getDocs(itemsQ);
+      setItems(itemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } else {
+      setResult(null);
+      setItems([]);
+    }
   };
 
   const statuses: Record<string, string> = { pending: "قيد المراجعة", processing: "قيد التجهيز", shipped: "تم الشحن", delivered: "تم التوصيل", cancelled: "ملغي" };
