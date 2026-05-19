@@ -11,6 +11,12 @@ function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup" | "magic-link">("login");
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
 
   useEffect(() => {
     if (isSignInWithEmailLink(auth, window.location.href)) {
@@ -45,8 +51,6 @@ function Login() {
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
     
     setLoading(true);
     try {
@@ -60,14 +64,11 @@ function Login() {
         toast.success("تم إرسال رابط تسجيل الدخول إلى بريدك الإلكتروني");
         setMode("login");
       } else {
-        const password = formData.get("password") as string;
-        
         if (mode === "login") {
           await signInWithEmailAndPassword(auth, email, password);
           toast.success("تم تسجيل الدخول");
           navigate({ to: "/account" });
         } else {
-          const name = formData.get("name") as string;
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const user = userCredential.user;
           await updateProfile(user, { displayName: name });
@@ -102,12 +103,12 @@ function Login() {
         </p>
         <form onSubmit={submit} className="space-y-4">
           {mode === "signup" && (
-            <input name="name" required placeholder="الاسم الكامل" autoComplete="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" />
+            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="الاسم الكامل" autoComplete="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" />
           )}
-          <input name="email" required type="email" placeholder="البريد الإلكتروني" autoComplete="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} required type="email" placeholder="البريد الإلكتروني" autoComplete="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" />
           
           {mode !== "magic-link" && (
-            <input name="password" required type="password" placeholder="كلمة المرور" autoComplete="new-password" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" minLength={6} />
+            <input value={password} onChange={(e) => setPassword(e.target.value)} required type="password" placeholder="كلمة المرور" autoComplete="new-password" spellCheck="false" className="w-full px-4 py-3 rounded-xl border border-input bg-background/50 focus:bg-background focus:ring-2 focus:ring-gold/50 outline-none transition" minLength={6} />
           )}
           
           <button disabled={loading} className="w-full gradient-gold text-primary-foreground py-3.5 rounded-xl font-bold disabled:opacity-50 shadow-lg shadow-gold/20 hover:shadow-gold/40 transition">
