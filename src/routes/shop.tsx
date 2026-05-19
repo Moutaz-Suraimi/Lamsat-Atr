@@ -9,10 +9,24 @@ import { Search } from "lucide-react";
 export const Route = createFileRoute("/shop")({ component: Shop });
 
 function Shop() {
-  const [q, setQ] = useState("");
-  const deferredQ = useDeferredValue(q);
   const [cat, setCat] = useState<string>("all");
   const [sort, setSort] = useState("newest");
+
+  // Debounced search query
+  const [debouncedQ, setDebouncedQ] = useState("");
+  
+  // Custom debounced handler
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Clear previous timeout
+    if ((window as any).searchTimeout) clearTimeout((window as any).searchTimeout);
+    
+    // Set new timeout
+    (window as any).searchTimeout = setTimeout(() => {
+      setDebouncedQ(value);
+    }, 300);
+  };
 
   const { data: cats } = useQuery({ 
     queryKey: ["cats"], 
@@ -41,7 +55,7 @@ function Shop() {
     },
   });
 
-  const filtered = useMemo(() => (products ?? []).filter((p) => p.name.toLowerCase().includes(deferredQ.toLowerCase())), [products, deferredQ]);
+  const filtered = useMemo(() => (products ?? []).filter((p) => p.name.toLowerCase().includes(debouncedQ.toLowerCase())), [products, debouncedQ]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -53,7 +67,11 @@ function Shop() {
         <aside className="bg-card border border-border rounded-2xl p-4 h-fit lg:sticky lg:top-24">
           <div className="relative mb-4">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن منتج" className="w-full pr-9 pl-3 py-2 rounded-lg border border-input bg-background text-sm" />
+            <input 
+              onChange={handleSearchChange} 
+              placeholder="ابحث عن منتج" 
+              className="w-full pr-9 pl-3 py-2 rounded-lg border border-input bg-background text-sm" 
+            />
           </div>
           <h3 className="font-bold mb-2 text-sm">الأقسام</h3>
           <div className="flex flex-col gap-1">
